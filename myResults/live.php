@@ -6,6 +6,7 @@ LiveTiming
 	
 	$xml=simplexml_load_file("http://www.genevamodelcars.ch/wp-content/plugins/myResults/config.xml");
 	$connected = true;
+        date_default_timezone_set('Europe/Zurich');
 
 	if($xml===FALSE) {
 		exit('Echec lors de l\'ouverture du fichier config.');
@@ -63,7 +64,7 @@ LiveTiming
 			$totaltime = $sessiondata["total"];
 			
 
-		echo '<tr><td><a href=/myresults/?transponder=' . $sessiondata["transponder"] . '&daydate=' . date('dmY') . '>' . $transponder . '</a></td><td>' . $lapnumber . '</td><td>' . number_format($laptime,3) . '</td><td>' . number_format($bestlap,3) . '</td><td>' . number_format($averagelap,3) . '</td><td>' . number_format($totaltime,3) . '</td></tr>';		
+		echo '<tr><td><a style="text-decoration: underline;" href=/myresults/?transponder=' . $sessiondata["transponder"] . '&daydate=' . date('dmY') . '>' . $transponder . '</a></td><td>' . $lapnumber . '</td><td>' . number_format($laptime,3) . '</td><td>' . number_format($bestlap,3) . '</td><td>' . number_format($averagelap,3) . '</td><td>' . number_format($totaltime,3) . '</td></tr>';		
 					
 		}
 

@@ -2,7 +2,7 @@
 /***
  Plugin Name: myResults by genevamodelcars
  Description: genevamodelcars plugin for display results.
- Version: 0.1
+ Version: 0.2
  Author: BDM for genevamodelcars
 */
 
@@ -32,6 +32,7 @@ class myResults
 		add_shortcode('myResults_status', array($this, 'myResults_status_fct') );
 		add_shortcode('myResults_activelist', array($this, 'myResults_activelist_fct') );
 		add_shortcode('myResults_transponder', array($this, 'myResults_transponder_fct') );
+		add_shortcode('myResults_ranking', array($this, 'myResults_ranking_fct') );
 	} // END __construct()
 
 	/**
@@ -223,6 +224,10 @@ class myResults
  		
 		$varname = $_POST['formName'];	
 		$statuscollection->update(array('transponder' => $transponder),array('$set' => array('name' => $varname)));
+		$varminlap = $_POST['formminlap'];	
+		$statuscollection->update(array('transponder' => $transponder),array('$set' => array('minlap' => $varminlap)));
+		$varmaxlap = $_POST['formmaxlap'];	
+		$statuscollection->update(array('transponder' => $transponder),array('$set' => array('maxlap' => $varmaxlap)));
 		
 		}
 
@@ -296,26 +301,42 @@ class myResults
 		} else {
 			$transpondername = "";
 		}
+
+		if ($cursor[minlap] != null) {
+			$minlap = $cursor[minlap];
+		} else {
+			$minlap = 0;
+		}
+
+		if ($cursor[maxlap] != null) {
+			$maxlap = $cursor[maxlap];
+		} else {
+			$maxlap = 120;
+		}
 		
 		if ( is_user_logged_in() ) {
 			$usermessage = '
 			<div><b>Numéro du transpondeur :</b>   ' . $transponder . '</div><br />
 			<div><form action="" method="post">
-			<label for="sel3">Ajouter/modifier nom du transponder:</label><br />
-    			<input id = "sel3" style = "width: 100%;" type="text" name="formName" maxlength="16" value="' . $transpondername . '">
-    			<br /><div style="text-align: right; margin-top: 10px;"><input class="btn btn-default" type="submit" name="formSubmit" value="Valider">
+			<label for="sel3">Modifier nom du transponder:</label><br />
+    			<input id = "sel3" style = "width: 100%;" type="text" name="formName" maxlength="24" value="' . $transpondername . '">
+			<label for="sel4">Modifier la valeur du minlap [sec]:</label><br />
+    			<input id = "sel4" style = "width: 100%;" type="number" name="formminlap" min="0" max="60" step=".1" value="' . $minlap . '">
+			<label for="sel5">Modifier la valeur du maxlap [sec]:</label><br />
+    			<input id = "sel5" style = "width: 100%;" type="number" name="formmaxlap" min="30" max="360" step="1" value="' . $maxlap . '">
+    			<br/><div style="text-align: right; margin-top: 10px;"><input class="btn btn-default" type="submit" name="formSubmit" value="Valider">
 			</form></div></div>
 			';
 
 		} else {
-			$usermessage = '<div"><b>Information :   </b><a href="/login" title = "login">Connectez-vous</a> pour assigner un nom au transpondeur.</div>';
+			$usermessage = '<div"><b>Information :   </b><a href="/login" title = "login">Connectez-vous</a> pour assigner un nom au transpondeur ou pour modifier un filtre.</div>';
 		}
 			
-		echo '<div class="col-md-6"><div style="text-align: right; margin-top: 25px;"><a class="btn btn-danger" role="button" data-toggle="collapse" href="#EditionName" aria-expanded="false" aria-controls="EditionName">Edition</a></div></div><div class="col-md-12"><br /><div class="collapse" id="EditionName"><div class="alert alert-warning" >' . $usermessage . '</div></div></div>';
+		echo '<div class="col-md-6"><div style="text-align: right; margin-top: 25px;"><a class="btn btn-danger" role="button" data-toggle="collapse" href="#EditionName" aria-expanded="false" aria-controls="EditionName">Filtres</a></div></div><div class="col-md-12"><br /><div class="collapse" id="EditionName"><div class="alert alert-warning" >' . $usermessage . '</div></div></div>';
 		
 		}
 
-		echo '</div><hr><br>';		
+		echo '</div><hr>';		
 
 		?>
 		<script>
@@ -331,7 +352,7 @@ class myResults
 		}
 	}
   			
-	$string_results = '<div class="container"><div class = "loader" style="position: relative; text-align: center;"><button class="btn btn-lg btn-success"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span> Chargement...</button><br></div><div id="auto_load_results_div" class="auto_load_div"></div></div>';
+	$string_results = '<div class = "loader" style="position: relative; text-align: center;"><button class="btn btn-lg btn-success"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>  Chargement...</button><br></div><div id="auto_load_results_div" class="auto_load_div"></div>';
 
 	?>
 		
@@ -365,6 +386,38 @@ class myResults
 	
 	}
 	
+public function myResults_ranking_fct()
+	{
+  			
+	$string_ranking = '<div class = "loader" style="position: relative; text-align: center;"><button class="btn btn-lg btn-success"><span class="glyphicon glyphicon-refresh glyphicon-refresh-animate"></span>  Chargement...</button><br></div><div id="auto_load_ranking_div" class="auto_load_div"></div>';
+
+	?>
+
+   	<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+   	<script>
+	
+      	function auto_load_ranking(){
+        	$.ajax({
+          	url: "http://www.genevamodelcars.ch/wp-content/plugins/myResults/ranking.php",
+          	cache: false,
+	       	success: function(data){
+		$(".loader").fadeOut(100),
+             	$("#auto_load_ranking_div").html(data);
+          	} 
+        	});
+      	}
+	
+      	$(document).ready(function(){
+	
+        	auto_load_ranking(); //Call auto_load() function when DOM is Ready
+	
+      	});
+
+  	 </script>
+	<?php
+
+	return $string_ranking;
+	}
 	
 	/**
 	 * Checks if the plugin attribute is valid
