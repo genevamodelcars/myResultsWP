@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<records>
+	<layout>
+		<trackname>trackname</trackname>
+		<img>layout-image-location</img>
+		<clockwise>
+			<timeval>N/A</timeval>
+			<dateval>N/A</dateval>
+			<driver>N/A</driver>
+			<catergory>N/A</catergory>
+		</clockwise>
+		<counterclockwise>
+			<timeval>N/A</timeval>
+			<dateval>N/A</dateval>
+			<driver>N/A</driver>
+			<catergory>N/A</catergory>
+		</counterclockwise>
+	</layout>
+</records>

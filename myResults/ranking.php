@@ -3,27 +3,37 @@
 Ranking function
 Call the last pass entries
 */
+	header("Access-Control-Allow-Origin: *"); 
+	header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+	
+	require $_SERVER['DOCUMENT_ROOT'].'/vendor/autoload.php';
+
 	//Variables	
-	$xml=simplexml_load_file("http://www.genevamodelcars.ch/wp-content/plugins/myResults/config.xml");
+	$xml=simplexml_load_file("http://www.genevamodelcars.ch/html/wp-content/plugins/myResults/config.xml");
 	$connected = true;
 	$dayupdate = 7;
 	
+	/*ini_set('display_errors', 1);
+	ini_set('display_startup_errors', 1);
+	error_reporting(E_ALL);*/
+	
 	//Time format in french
 	$month = array("", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"); 
-        date_default_timezone_set('Europe/Zurich');
-        error_reporting(E_ERROR | E_PARSE);
+    date_default_timezone_set('Europe/Zurich');
+    error_reporting(E_ERROR | E_PARSE);
 
 	if($xml===FALSE) {
-		exit('Echec lors de l\'ouverture du fichier config.');
+			exit('Echec lors de l\'ouverture du fichier config.');
 	} else {	
-		$dbservername = $xml->dbserver->adress;
-		$dbactivename = $xml->dbserver->dbname;
+			$dbservername = $xml->dbserver->adress;
+			$dbactivename = $xml->dbserver->dbname;
 
 	try {
-		$mongo = new MongoClient($dbservername);
-		}
-		catch ( MongoConnectionException $e ) 
-		{
+			$mongo = new MongoDB\Client($dbservername);
+			
+	}
+	catch (MongoDB\Driver\Exception\ConnectionTimeoutException $e)
+	{
 		$connected = false;
   	  	echo 'Echec lors de l\'ouverture de la base de donnée.';
   	  	exit();
@@ -32,38 +42,72 @@ Call the last pass entries
 	if ($connected == true){
 		//echo 'Hello';
 
-		$db = $mongo->selectDB($dbactivename);
+		$yeardate = $_GET['yeardate'];
+		$actualseason = true;
+
+		if ($yeardate == NULL)
+		{
+			$db = $mongo->selectDataBase($dbactivename);
+			$yeardate = $dbactivename;
+		}
+		else
+		{
+        	$db = $mongo->selectDataBase($yeardate);
+			if ($yeardate != $dbactivename) {
+			$actualseason = false;
+			}
+		}
+
+		//$db = $mongo->selectDB($dbactivename);
 		$rankingcollection = $db->selectCollection("ranking");
-		$cursor = $rankingcollection->find()->sort(array('score'=>-1));
+		$cursor = $rankingcollection->find(array(),array("sort" => array('score'=>-1)));
+		
 
 		$statuscollection = $db->selectCollection("active");
 
 		foreach($cursor as $jokes) {
-		if ((strtotime('monday')-strtotime(date('d-M-y', $jokes[date]->sec))) > 0)
+		if ((strtotime('monday')-strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U')))) > 0) 
 		{
 			//echo intval(date("W"));
 			//echo intval(date('W', $jokes[date]->sec));
+			//echo strtotime('monday this week') . '<br>';
+			//echo strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U'))) . '<br>';
 
-			if ((strtotime('monday this week')-strtotime(date('d-M-y', $jokes[date]->sec))) > ($dayupdate*86400))
+			if ((strtotime('monday this week') - strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U')))) > ($dayupdate*86400))
 			{
 				$lastweekranking[] = $jokes[transponder];
-			} else {
+			} elseif ((strtotime('monday this week') - strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U')))) > 0) {
 				$weekranking[] = $jokes[transponder];
-				$weekscore[] = $jokes[score];
-				$weekdate[] = date('dmY', $jokes[date]->sec);
+				if($jokes[score]<0){
+					$weekscore[] = 0;
+				}
+				else {
+					$weekscore[] = $jokes[score];
+				}
+				$weekdate[] = date('dmY', $jokes[date]->toDateTime()->format('U'));
 			}
 			
-			if ((strtotime('first monday this month')- strtotime(date('d-M-y', $jokes[date]->sec))) > ($dayupdate*86400*date('t')))
+			if (((strtotime('first monday of this month')- strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U')))) < ($dayupdate*86400/7*date('t', strtotime('last month')))) && ((strtotime('first monday of this month')- strtotime(date('d-M-y',$jokes[date]->toDateTime()->format('U')))) > 0))
 			{
 				$monthranking[] = $jokes[transponder];
+				if($jokes[score]<0){
+					$monthscore[] = 0;
+				}
+				else{
 				$monthscore[] = $jokes[score];
-				$monthdate[] = date('dmY', $jokes[date]->sec);
+				}
+				$monthdate[] = date('dmY', $jokes[date]->toDateTime()->format('U'));
 			}
 
 			$ranking[] = $jokes[transponder];
+			if($jokes[score]<0){
+				$score[] = 0;
+			}
+			else{
 			$score[] = $jokes[score];
-			$date[] = date('d-M-Y', $jokes[date]->sec);
-			$dateurl[] = date('dmY', $jokes[date]->sec);
+			}
+			$date[] = date('d-M-Y', $jokes[date]->toDateTime()->format('U'));
+			$dateurl[] = date('dmY', $jokes[date]->toDateTime()->format('U'));
 		
 		}
 		}
@@ -76,19 +120,23 @@ Call the last pass entries
 		$monthrankingindex = array_values($monthranking);
 		$monthranking = array_values(array_unique($monthranking, SORT_NUMERIC));
 	
-		//print_r($ranking);		
-		//print_r($rankingindex);
+		//print_r($monthrankingindex);		
+		//print_r($monthranking);
+		//print_r(date('t', strtotime('last month')));
 		//print_r($lastweekranking);
 		//print_r($score);
 		
-		echo '<div style = "text-align: right;"><b>Prochaine mise à jour: </b><span class="label label-success">' . date('d M Y', strtotime('next monday')) . '</span></div>';		
+		if ($actualseason == TRUE) {	
 
-		echo '	<div class="col-md-6"><h2><span class="label label-default" style = "background-color: #777;">Top 5</span>   Semaine   ' . (date('W')-1) . '</h2><table class="table">
+		echo '<div style = "text-align: right;"><b>Prochaine mise à jour: </b><p">' . date('d M Y', strtotime('next monday')) . '</p></div>';	
+
+		echo '	<div ><h2><span class="label label-default" style = "background-color: #666;">Top 5</span>   Semaine   ' . (date('W')-1) . '</h2><table class="myResults_livetiming_table">
     			<thead>
      			<tr>
-       			<th class="col-md-1">Rank</th>
-      			<th class="col-md-3">Transponder</th>
-       			<th class="col-md-2">Score</th>
+       			<th style="width:25%;">Rank</th>
+      			<th>Transponder</th>
+       			<th>Score</th>
+				<th style="width: 30%;"></th>
       			</tr>
     			</thead>
     			<tbody>';
@@ -105,7 +153,17 @@ Call the last pass entries
 		$transponder = $weekranking[$i];
 		$cursor = $statuscollection->findOne(array("transponder" => $transponder));
 		$scoredata = $weekscore[array_search($weekranking[$i], $weekrankingindex)];
-
+		
+		if($scoredata > 9010)
+		{
+			$scoredatabar = number_format(abs($scoredata - 9000) / 1000 *100,2);
+			$scoredatacolor = number_format(abs($scoredata - 9000) / 1000 *255,0);
+		}
+		else { 
+			$scoredatabar = 1;
+			$scoredatacolor = number_format(0 * 255,0);
+		}	
+		
 		if ($cursor[name] != null) {
 			$transponder = $cursor[name];
 		}
@@ -118,7 +176,7 @@ Call the last pass entries
 		$class = '';
 		}
 
-		echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . '</td><td style = "vertical-align: middle;"><a style="text-decoration: underline;" href=/myresults/?transponder=' . $weekranking[$i] . '&daydate=' . $weekdate[array_search($weekranking[$i], $weekrankingindex)] . '>' . $transponder  . '</td><td>' . number_format($scoredata,3, ',',"'") . '</td></tr>';
+		echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . '</td><td style = "vertical-align: middle;"><a style="color: white;" href=/myresults/?yeardate=' . $yeardate . '&transponder=' . $weekranking[$i] . '&daydate=' . $weekdate[array_search($weekranking[$i], $weekrankingindex)] . '>' . $transponder  . '</td><td>' . number_format($scoredata,1, ',',"'") . '</td><td><span style="height: 15px;display:block; width:'. $scoredatabar . '%; background-color:rgb(50,180,' . $scoredatacolor . ');"></span></td></tr>';
 		}
 
 		echo   '</tr>
@@ -126,12 +184,13 @@ Call the last pass entries
  			</table>
 			</div>';
 
-		echo '	<div class="col-md-6"><h2><span class="label label-default" style = "background-color: #777;">Top 5</span>   ' . $month[date('n', strtotime('last month'))] . '</h2><table class="table">
+		echo '	<div class="col-md-6"><h2><span class="label label-default" style = "background-color: #666;">Top 5</span>   ' . $month[date('n', strtotime('last month'))] . '</h2><table class="myResults_livetiming_table">
     			<thead>
      			<tr>
-       			<th class="col-md-1">Rank</th>
-      			<th class="col-md-3">Transponder</th>
-       			<th class="col-md-2">Score</th>
+       			<th style="width:25%;">Rank</th>
+      			<th>Transponder</th>
+       			<th>Score</th>
+				<th style="width: 30%;"></th>
       			</tr>
     			</thead>
     			<tbody>';
@@ -148,6 +207,28 @@ Call the last pass entries
 		$transponder = $monthranking[$i];
 		$cursor = $statuscollection->findOne(array("transponder" => $transponder));
 		$scoredata = $monthscore[array_search($monthranking[$i], $monthrankingindex)];
+		
+		if($scoredata > 9010)
+		{
+			$scoredatabar = number_format(abs($scoredata - 9000) / 1000 *100,2);
+			$scoredatacolor = number_format(abs($scoredata - 9000) / 1000 *255,0);
+		}
+		else { 
+			$scoredatabar = 1;
+			$scoredatacolor = number_format(0 * 255,0);
+		}
+
+		if ($cursor[name] != null) {
+			$transponder = $cursor[name];
+		}
+
+
+		if ($i == 0)
+		{
+		$class = '';
+		} else {
+		$class = '';
+		}
 
 		if ($cursor[name] != null) {
 			$transponder = $cursor[name];
@@ -159,20 +240,23 @@ Call the last pass entries
 		} else {
 		$class = '';
 		}
-		echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . '</td><td style = "vertical-align: middle;"><a style="text-decoration: underline;" href=/myresults/?transponder=' . $monthranking[$i] . '&daydate=' . $monthdate[array_search($monthranking[$i], $monthrankingindex)] . '>' . $transponder  . '</td><td>' . number_format($scoredata,3, ',',"'") . '</td></tr>';
+		echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . '</td><td style = "vertical-align: middle;"><a style="color: white;" href=/myresults/?yeardate=' . $yeardate . '&transponder=' . $monthranking[$i] . '&daydate=' . $monthdate[array_search($monthranking[$i], $monthrankingindex)] . '>' . $transponder  . '</td><td>' . number_format($scoredata,1, ',',"'") . '</td><td><span style="height: 15px;display:block; width:'. $scoredatabar . '%; background-color:rgb(50,180,' . $scoredatacolor . ');"></span></td></tr>';
 		}
 
 		echo   '</tr>
    			</tbody>
  			</table>
 			</div>';
+
+		}
 		
-		echo '	<div class="col-md-12"><h2>Classement général</h2><table class="table">
+		echo '	<div><h2>Classement général</h2><table class="myResults_livetiming_table">
     			<thead>
      			<tr>
-       			<th class="col-md-1">Rank</th>
-      			<th class="col-md-3">Transponder</th>
-			<th class="col-md-8">Score</th>
+       			<th style="width:25%;">Rank</th>
+      			<th>Transponder</th>
+				<th>Score</th>
+				<th style="width: 30%;"></th>
       			</tr>
     			</thead>
     			<tbody>';		
@@ -181,9 +265,17 @@ Call the last pass entries
 		{
 			$transponder = $ranking[$i];
 			$scoredata = $score[array_search($ranking[$i], $rankingindex)];
-			$percentdata = number_format(($scoredata-6000)/40,3);
-			$colorvaluered = number_format(($scoredata-8000)/2000*20,0);
-			$colorvalueblue = number_format((1-(($scoredata-8000)/2000))*100+155,0);
+			$percentdata = number_format(($scoredata-9000)/10,3);
+			
+			if($scoredata > 9010)
+			{
+				$scoredatabar = number_format(abs($scoredata - 9000) / 1000 *100,2);
+				$scoredatacolor = number_format(abs($scoredata - 9000) / 1000 *255,0);
+			}
+			else { 
+				$scoredatabar = 1;
+				$scoredatacolor = number_format(0 * 255,0);
+			}
 
 			$cursor = $statuscollection->findOne(array("transponder" => $transponder));
 			if ($cursor[name] != null) {
@@ -194,12 +286,12 @@ Call the last pass entries
 
 			if ((array_search($ranking[$i], $lastweekranking) - $pos) > 0)
 			{	
-				$diff = '   <span class="glyphicon glyphicon-chevron-up" style = "color: #5cb85c; margin-left: 20px; font-size: larger; margin-right: 10px"></span> +' . (array_search($ranking[$i], $lastweekranking) - $pos) ;
+				$diff = '   <span style = "color: #5cb85c; margin-left: 20px; margin-right: 10px">↑</span> +' . (array_search($ranking[$i], $lastweekranking) - $pos) ;
 			} elseif ((array_search($ranking[$i], $lastweekranking) - $pos) < 0)
 			{
-				$diff = '   <span class="glyphicon glyphicon-chevron-down" style = "color: #d9534f; margin-left: 20px; font-size: larger; margin-right: 10px"></span>' . (array_search($ranking[$i], $lastweekranking)- $pos) ;
+				$diff = '   <span style = "color: #d9534f; margin-left: 20px; margin-right: 10px">↓</span>' . (array_search($ranking[$i], $lastweekranking)- $pos) ;
 			} else {
-				$diff = '   <span class="glyphicon glyphicon-minus" style = "color: #f0ad4e; margin-left: 20px; font-size: larger; margin-right: 10px"></span> +/-0';
+				$diff = '   <span style = "color: #f0ad4e; margin-left: 20px; margin-right: 10px">=</span> +/-0';
 			}
 			
 			if ($i == 0)
@@ -208,7 +300,7 @@ Call the last pass entries
 			} else {
 			$class = '';
 			}
-			if ($scoredata > 6000)
+			if ($scoredata > 9000)
 			{
 			$scorewidth = $percentdata;
 			} else {
@@ -217,7 +309,8 @@ Call the last pass entries
 
 			
 
-			echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . $diff . '</td><td style = "vertical-align: middle;"><a style="text-decoration: underline;" href=/myresults/?transponder=' . $ranking[$i] . '&daydate=' . $dateurl[array_search($ranking[$i], $rankingindex)] . '>' . $transponder . '</a></td><td><div class="progress" style = "margin-bottom: 5px; margin-top: 5px;"><div class="progress-bar" role="progressbar" style="background-color: rgba(' . $colorvaluered . ', 150,' . $colorvalueblue . ',.7); width:' . $scorewidth . '%;"><span class="progress-type">' . number_format($scoredata,3, ',',"'") . ' (' . $date[array_search($ranking[$i], $rankingindex)] . ')' . '</span></div></div></td></tr>';
+			//echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . $diff . '</td><td style = "vertical-align: middle;"><a style="text-decoration: underline;" href=/myresults/?yeardate=' . $yeardate . '&transponder=' . $ranking[$i] . '&daydate=' . $dateurl[array_search($ranking[$i], $rankingindex)] . '>' . $transponder . '</a></td><td><div class="progress" style = "margin-bottom: 5px; margin-top: 5px;"><div class="progress-bar" role="progressbar" style="background-color: rgba(' . $colorvaluered . ', 150,' . $colorvalueblue . ',.7); width:' . $scorewidth . '%;"><span class="progress-type">' . number_format($scoredata,3, ',',"'") . ' (' . $date[array_search($ranking[$i], $rankingindex)] . ')' . '</span></div></div></td></tr>';
+			echo '<tr class = "' . $class . '"><td style = "vertical-align: middle;">' . ($i + 1) . $diff . '</td><td style = "vertical-align: middle;"><a style="color: white;" href=/myresults/?yeardate=' . $yeardate . '&transponder=' . $ranking[$i] . '&daydate=' . $dateurl[array_search($ranking[$i], $rankingindex)] . '>' . $transponder . '</a></td><td>' . number_format($scoredata,1, ',',"'") . '</td><td><span style="height: 15px;display:block; width:'. $scoredatabar . '%; background-color:rgb(50,180,' . $scoredatacolor . ');"></span></td></tr>';
 		}
 	
 		echo   '</tr>
@@ -230,5 +323,6 @@ Call the last pass entries
 		}
 
 	}
+	
 
 ?>
